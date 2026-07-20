@@ -8,16 +8,10 @@
     flake-parts.lib.mkFlake { inherit inputs; } {
       systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
       perSystem = { config, inputs', system, pkgs, lib, ... }: {
-        packages.x52-just = pkgs.stdenv.mkDerivation {
-          name = "x52-just";
-
-          src = ./just/src;
-
-          installPhase = ''
-            mkdir -p $out
-            cp $src/*.just $out/
-          '';
-        };
+        packages.x52-just = pkgs.runCommand "x52-just" { } ''
+          mkdir -p "$out"
+          cp ${./just/src}/*.just "$out/"
+        '';
 
         devShells.default = pkgs.mkShellNoCC {
           packages = [
