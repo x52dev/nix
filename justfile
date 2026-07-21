@@ -1,3 +1,3 @@
 # Format project.
 fmt:
-    nixpkgs-fmt .
+    nix fmt
