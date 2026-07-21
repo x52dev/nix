@@ -22,13 +22,68 @@
           lib,
           ...
         }:
+        let
+          x52-bump-changelogs = pkgs.writeShellApplication {
+            name = "x52-bump-changelogs";
+            runtimeInputs = [
+              pkgs.coreutils
+              pkgs.gawk
+              pkgs.gh
+              pkgs.git
+              pkgs.gnugrep
+              pkgs.gnused
+              pkgs.jq
+            ];
+            text = builtins.readFile ./release-tools/bump-changelogs.sh;
+          };
+
+          x52-update-release-notes = pkgs.writeShellApplication {
+            name = "x52-update-release-notes";
+            runtimeInputs = [
+              pkgs.coreutils
+              pkgs.gawk
+              pkgs.gh
+              pkgs.git
+              pkgs.jq
+            ];
+            text = builtins.readFile ./release-tools/update-release-notes.sh;
+          };
+
+          x52-release-tools = pkgs.symlinkJoin {
+            name = "x52-release-tools";
+            paths = [
+              x52-bump-changelogs
+              x52-update-release-notes
+            ];
+          };
+        in
         {
-          packages.x52-just = pkgs.runCommand "x52-just" { } ''
-            mkdir -p "$out"
-            cp ${./just/src}/*.just "$out/"
-          '';
+          packages = {
+            x52-just = pkgs.runCommand "x52-just" { } ''
+              mkdir -p "$out"
+              cp ${./just/src}/*.just "$out/"
+            '';
+
+            inherit x52-release-tools;
+          };
 
           checks = {
+            release-tools =
+              pkgs.runCommand "x52-release-tools-test"
+                {
+                  nativeBuildInputs = [
+                    pkgs.bash
+                    pkgs.diffutils
+                    pkgs.gnugrep
+                    x52-release-tools
+                  ];
+                  BASH_BIN = "${pkgs.bash}/bin/bash";
+                }
+                ''
+                  bash ${./release-tools/test.sh}
+                  touch "$out"
+                '';
+
             formatting =
               pkgs.runCommand "check-formatting"
                 {
@@ -97,6 +152,7 @@
             packages = [
               config.formatter
               pkgs.just
+              x52-release-tools
             ];
           };
 
