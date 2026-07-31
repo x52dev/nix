@@ -1,3 +1,4 @@
 # nix & friends
 result
 /.direnv
+/.toolchain

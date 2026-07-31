@@ -44,10 +44,37 @@ check-msrv:
 
 The consuming environment must provide `just`, `cargo`, and `jq`. The `msrv_rustup` form also expects a rustup-managed toolchain.
 
+## Flake-parts module
+
+`flakeModules.default` and `flakeModules.justRust` provide `x52.justRust.shellHook`. Add it to a development shell to create an ignored `.toolchain/rust.just` symlink when the shell starts. The module does not select or add a `just` package.
+
+```nix
+imports = [ inputs.x52.flakeModules.default ];
+
+perSystem = { config, pkgs, ... }: {
+  devShells.default = pkgs.mkShell {
+    packages = [
+      pkgs.cargo
+      pkgs.just
+    ];
+
+    shellHook = config.x52.justRust.shellHook;
+  };
+};
+```
+
+For an existing hook, append `config.x52.justRust.shellHook` to it. Set `x52.justRust.directory` in `perSystem` when a project needs another directory.
+
+The shell hook runs for `nix develop`, direnv, and the `nicknovitski/nix-develop` GitHub Action. Add the directory to `.gitignore`:
+
+```gitignore
+/.toolchain/
+```
+
 To pin this repository in a consuming flake, add it as an input:
 
 ```nix
-inputs.x52-nix = {
+inputs.x52 = {
   url = "github:x52dev/nix";
   inputs.nixpkgs.follows = "nixpkgs";
   inputs.flake-parts.follows = "flake-parts";
@@ -58,11 +85,11 @@ With flake-parts, re-export `x52-just` or add the release tools to a development
 
 ```nix
 perSystem = { pkgs, inputs', ... }: {
-  packages.x52-just = inputs'.x52-nix.packages.x52-just;
+  packages.x52-just = inputs'.x52.packages.x52-just;
 
   devShells.default = pkgs.mkShell {
     packages = [
-      inputs'.x52-nix.packages.x52-release-tools
+      inputs'.x52.packages.x52-release-tools
     ];
   };
 };
