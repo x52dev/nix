@@ -6,7 +6,20 @@
 
   outputs =
     inputs@{ flake-parts, ... }:
+    let
+      justRustModule = import ./modules/rust-just.nix;
+    in
     flake-parts.lib.mkFlake { inherit inputs; } {
+      imports = [
+        inputs.flake-parts.flakeModules.flakeModules
+        justRustModule
+      ];
+
+      flake.flakeModules = {
+        default = justRustModule;
+        justRust = justRustModule;
+      };
+
       systems = [
         "x86_64-linux"
         "aarch64-linux"
@@ -23,6 +36,11 @@
           ...
         }:
         let
+          x52Just = pkgs.callPackage ./just/package.nix { };
+          initToolchain = pkgs.callPackage ./just/init-toolchain.nix {
+            inherit x52Just;
+          };
+
           x52-bump-changelogs = pkgs.writeShellApplication {
             name = "x52-bump-changelogs";
             runtimeInputs = [
@@ -59,10 +77,7 @@
         in
         {
           packages = {
-            x52-just = pkgs.runCommand "x52-just" { } ''
-              mkdir -p "$out"
-              cp ${./just/src}/*.just "$out/"
-            '';
+            x52-just = x52Just;
 
             inherit x52-release-tools;
           };
@@ -144,6 +159,28 @@
                     exit 1
                   fi
 
+                  touch "$out"
+                '';
+
+            rust-just-module =
+              pkgs.runCommand "check-rust-just-module"
+                {
+                  nativeBuildInputs = [
+                    initToolchain
+                    pkgs.coreutils
+                    pkgs.just
+                  ];
+                }
+                ''
+                  mkdir toolchain-test
+                  cd toolchain-test
+
+                  x52-init-rust-just
+                  test -L .toolchain/rust.just
+                  test "$(readlink .toolchain/rust.just)" = "${x52Just}/rust.just"
+
+                  printf "import '.toolchain/rust.just'\n" > justfile
+                  just --justfile justfile --list > /dev/null
                   touch "$out"
                 '';
           };
