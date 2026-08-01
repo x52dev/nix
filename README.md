@@ -19,6 +19,8 @@ Contains release-plz post-processing commands:
 
 - `x52-bump-changelogs` checks out a release-plz pull request, adds the released versions to crate changelogs, updates README version links, and pushes a commit when anything changed.
 - `x52-update-release-notes` copies the matching changelog sections into GitHub releases.
+- `x52-comment-release-pr` adds or updates a draft-release link comment on the merged release pull request.
+- `x52-comment-release-assets-uploaded` adds or updates a comment after the release assets are uploaded.
 
 The commands expect `cargo` to already be available. Git, GitHub CLI, jq, and the required shell utilities are supplied by the Nix package.
 
@@ -111,6 +113,15 @@ For GitHub Actions, enter the development shell before invoking the release comm
 ```
 
 Pass release-plz output through `RELEASE_PLZ_PR_JSON` or `RELEASE_PLZ_RELEASES_JSON`, and provide `GH_TOKEN` for GitHub mutations.
+
+Use a repository-specific HTML marker when posting release comments. It makes retries update the existing comment instead of creating another one:
+
+```sh
+x52-comment-release-pr "$RELEASE_PLZ_RELEASES_JSON" '<!-- example:draft-release-link -->'
+x52-comment-release-assets-uploaded "$RELEASE_PLZ_RELEASES_JSON" '<!-- example:release-assets-uploaded -->'
+```
+
+Both commands accept an optional third argument for the merge commit SHA. Without it, they use `GITHUB_SHA`.
 
 ## Development
 
