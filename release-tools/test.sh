@@ -110,15 +110,15 @@ grep -Fq 'gh <release> <edit> <demo-v1.1.0>' "$command_log"
 grep -Fq '<--notes=- Added feature.>' "$command_log"
 
 export GITHUB_REPOSITORY='example/demo'
-x52-comment-release-pr "$RELEASE_PLZ_RELEASES_JSON" '<!-- demo:draft-release-link -->' deadbeef
-x52-comment-release-assets-uploaded "$RELEASE_PLZ_RELEASES_JSON" '<!-- demo:release-assets-uploaded -->' deadbeef
+x52-comment-release-pr "$RELEASE_PLZ_RELEASES_JSON" deadbeef
+x52-comment-release-assets-uploaded "$RELEASE_PLZ_RELEASES_JSON" deadbeef
 
-grep -Fq 'gh <pr> <comment> <42> <--body> <<!-- demo:draft-release-link -->' "$command_log"
-grep -Fq 'gh <pr> <comment> <42> <--body> <<!-- demo:release-assets-uploaded -->' "$command_log"
+grep -Fq 'gh <pr> <comment> <42> <--body> <<!-- x52-draft-release-link -->' "$command_log"
+grep -Fq 'gh <pr> <comment> <42> <--body> <<!-- x52-release-assets-uploaded -->' "$command_log"
 
 export EXISTING_COMMENT_ID=99
-x52-comment-release-pr "$RELEASE_PLZ_RELEASES_JSON" '<!-- demo:draft-release-link -->' deadbeef
-x52-comment-release-assets-uploaded "$RELEASE_PLZ_RELEASES_JSON" '<!-- demo:release-assets-uploaded -->' deadbeef
+x52-comment-release-pr "$RELEASE_PLZ_RELEASES_JSON" deadbeef
+x52-comment-release-assets-uploaded "$RELEASE_PLZ_RELEASES_JSON" deadbeef
 
 [[ "$(grep -Fc 'gh <api> <--method> <PATCH> </repos/example/demo/issues/comments/99>' "$command_log")" == 2 ]]
 

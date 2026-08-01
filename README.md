@@ -114,14 +114,14 @@ For GitHub Actions, enter the development shell before invoking the release comm
 
 Pass release-plz output through `RELEASE_PLZ_PR_JSON` or `RELEASE_PLZ_RELEASES_JSON`, and provide `GH_TOKEN` for GitHub mutations.
 
-Use a repository-specific HTML marker when posting release comments. It makes retries update the existing comment instead of creating another one:
+The commands use fixed `x52-` HTML markers. They make retries update the existing comment instead of creating another one:
 
 ```sh
-x52-comment-release-pr "$RELEASE_PLZ_RELEASES_JSON" '<!-- example:draft-release-link -->'
-x52-comment-release-assets-uploaded "$RELEASE_PLZ_RELEASES_JSON" '<!-- example:release-assets-uploaded -->'
+x52-comment-release-pr "$RELEASE_PLZ_RELEASES_JSON"
+x52-comment-release-assets-uploaded "$RELEASE_PLZ_RELEASES_JSON"
 ```
 
-Both commands accept an optional third argument for the merge commit SHA. Without it, they use `GITHUB_SHA`.
+Both commands accept an optional second argument for the merge commit SHA. Without it, they use `GITHUB_SHA`.
 
 ## Development
 

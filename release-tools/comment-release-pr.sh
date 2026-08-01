@@ -1,8 +1,8 @@
 set -eEuo pipefail
 
 release_plz_releases_json="${1:?release-plz releases JSON is required}"
-marker="${2:?comment marker is required}"
-commit_sha="${3:-${GITHUB_SHA:-}}"
+marker="<!-- x52-draft-release-link -->"
+commit_sha="${2:-${GITHUB_SHA:-}}"
 gh_bin="${X52_GH:-gh}"
 
 if [[ -z "$commit_sha" ]]; then
