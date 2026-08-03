@@ -21,3 +21,21 @@ msrv := ```
         '
 ```
 msrv_rustup := "+" + msrv
+
+# Nightly toolchain used by external type checks.
+external-types-toolchain := "nightly-2026-03-20"
+
+# Check public APIs for exposed external types.
+check-external-types all_features="false":
+    #!/usr/bin/env bash
+    set -eEuo pipefail
+    cargo metadata --frozen --no-deps --format-version=1 \
+        | jq -r '.workspace_members as $members | .packages[] | select(.id as $id | $members | index($id)) | select(any(.targets[]; .kind | index("lib"))) | .manifest_path' \
+        | while read -r manifest_path; do
+            echo "Checking external types: ${manifest_path}"
+            args=(--manifest-path "${manifest_path}")
+            if [[ "{{ all_features }}" == "true" ]]; then
+                args+=(--all-features)
+            fi
+            cargo +{{ external-types-toolchain }} check-external-types "${args[@]}"
+        done
