@@ -26,7 +26,7 @@ msrv_rustup := "+" + msrv
 external-types-toolchain := "nightly-2026-03-20"
 
 # Check public APIs for exposed external types.
-check-external-types all_features="false":
+check-external-types all-features="":
     #!/usr/bin/env bash
     set -eEuo pipefail
     cargo metadata --frozen --no-deps --format-version=1 \
@@ -34,7 +34,7 @@ check-external-types all_features="false":
         | while read -r manifest_path; do
             echo "Checking external types: ${manifest_path}"
             args=(--manifest-path "${manifest_path}")
-            if [[ "{{ all_features }}" == "true" ]]; then
+            if [[ "{{ all-features }}" == "--all-features" ]]; then
                 args+=(--all-features)
             fi
             cargo +{{ external-types-toolchain }} check-external-types "${args[@]}"
