@@ -17,7 +17,7 @@ The lookup uses `cargo metadata --no-deps`, ignores non-workspace packages, and 
 
 Contains release-plz post-processing commands:
 
-- `x52-bump-changelogs` checks out a release-plz pull request, adds the released versions to crate changelogs, updates README version links, and pushes a commit when anything changed.
+- `x52-bump-changelogs` configures GitHub CLI Git authentication, checks out a release-plz pull request, adds the released versions to crate changelogs, updates README version links, and pushes a commit when anything changed.
 - `x52-update-release-notes` copies the matching changelog sections into GitHub releases.
 - `x52-comment-release-pr` adds or updates a draft-release link comment on the merged release pull request.
 - `x52-comment-release-assets-uploaded` adds or updates a comment after the release assets are uploaded.
@@ -112,7 +112,7 @@ For GitHub Actions, enter the development shell before invoking the release comm
   uses: nicknovitski/nix-develop@9be7cfb4b10451d3390a75dc18ad0465bed4932a # v1.2.1
 ```
 
-Pass release-plz output through `RELEASE_PLZ_PR_JSON` or `RELEASE_PLZ_RELEASES_JSON`, and provide `GH_TOKEN` for GitHub mutations.
+Pass release-plz output through `RELEASE_PLZ_PR_JSON` or `RELEASE_PLZ_RELEASES_JSON`, and provide `GH_TOKEN` for GitHub mutations. `x52-bump-changelogs` configures Git to use GitHub CLI credentials before it checks out and updates the release pull request.
 
 The commands use fixed `x52-` HTML markers. They make retries update the existing comment instead of creating another one:
 

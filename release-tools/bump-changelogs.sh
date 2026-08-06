@@ -8,6 +8,7 @@ git_bin="${X52_GIT:-git}"
 pr_number="$(printf '%s\n' "$release_plz_pr_json" | jq -r '.number')"
 
 if [[ -n "$pr_number" && "$pr_number" != "null" ]]; then
+    "$gh_bin" auth setup-git --hostname github.com
     "$gh_bin" pr checkout "$pr_number"
 fi
 

@@ -100,8 +100,13 @@ EOF
 diff -u "$test_root/expected-changelog.md" "$fixture_root/CHANGELOG.md"
 grep -Fq 'https://docs.rs/demo/1.1.0/demo/' "$fixture_root/README.md"
 [[ "$(grep -Fc 'git <commit> <-m> <docs: update changelog versions>' "$command_log")" == 1 ]]
+[[ "$(grep -Fc 'gh <auth> <setup-git> <--hostname> <github.com>' "$command_log")" == 2 ]]
 grep -Fq 'gh <pr> <checkout> <42>' "$command_log"
 grep -Fq 'git <push>' "$command_log"
+
+auth_setup_line="$(grep -n -m 1 'gh <auth> <setup-git> <--hostname> <github.com>' "$command_log" | cut -d: -f1)"
+checkout_line="$(grep -n -m 1 'gh <pr> <checkout> <42>' "$command_log" | cut -d: -f1)"
+[[ "$auth_setup_line" -lt "$checkout_line" ]]
 
 export RELEASE_PLZ_RELEASES_JSON='[{"package_name":"demo","version":"1.1.0","tag":"demo-v1.1.0"}]'
 x52-update-release-notes
@@ -132,6 +137,8 @@ EOF
 
 export RELEASE_PLZ_PR_JSON='{"number":42,"releases":[{"package_name":"demo","version":"1.0.0"}]}'
 x52-bump-changelogs
+
+[[ "$(grep -Fc 'gh <auth> <setup-git> <--hostname> <github.com>' "$command_log")" == 3 ]]
 
 cat >"$test_root/expected-first-release-changelog.md" <<'EOF'
 # Changelog
