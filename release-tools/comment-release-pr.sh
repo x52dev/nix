@@ -5,14 +5,31 @@ marker="<!-- x52-draft-release-link -->"
 commit_sha="${2:-${GITHUB_SHA:-}}"
 gh_bin="${X52_GH:-gh}"
 
+log() {
+    echo "x52-comment-release-pr: $*"
+}
+
 if [[ -z "$commit_sha" ]]; then
-    echo "No commit SHA provided; skipping release PR comment"
+    log "No commit SHA provided; skipping"
     exit 0
 fi
 
 if [[ -z "${GITHUB_REPOSITORY:-}" ]]; then
-    echo "GITHUB_REPOSITORY is not set; skipping release PR comment"
+    log "GITHUB_REPOSITORY is not set; skipping"
     exit 0
+fi
+
+if ! release_entries="$(
+    printf '%s\n' "$release_plz_releases_json" | jq -c '
+        if type == "array"
+            and all(.[]; (.tag | type == "string") and (.version | type == "string") and (.package_name | type == "string"))
+        then .[]
+        else error("expected an array of releases with tag, version, and package_name")
+        end
+    '
+)"; then
+    log "Invalid release-plz releases JSON"
+    exit 1
 fi
 
 pr_number="$(
@@ -22,9 +39,11 @@ pr_number="$(
 )"
 
 if [[ -z "$pr_number" ]]; then
-    echo "No merged PR found for ${commit_sha}; skipping release PR comment"
+    log "No merged PR found for ${commit_sha}; skipping"
     exit 0
 fi
+
+log "Resolved commit ${commit_sha} to merged PR #${pr_number}"
 
 release_lines=""
 
@@ -32,23 +51,32 @@ while read -r release; do
     tag="$(printf '%s\n' "$release" | jq -r '.tag')"
     version="$(printf '%s\n' "$release" | jq -r '.version')"
     package_name="$(printf '%s\n' "$release" | jq -r '.package_name')"
-    release_url="$(
+    log "Resolving release tag ${tag}"
+    release_info="$(
         "$gh_bin" api --paginate \
             "/repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
             | jq -r --arg tag "$tag" \
-                '[.[] | select(.tag_name == $tag)] | first | .html_url // empty'
+                '([.[] | select(.tag_name == $tag)] | first) as $release
+                | if $release == null then empty else [$release.html_url, $release.draft] | @tsv end'
     )"
 
-    if [[ -z "$release_url" ]]; then
-        echo "Release for tag ${tag} not found"
+    if [[ -z "$release_info" ]]; then
+        log "No release with tag ${tag} was returned by /repos/${GITHUB_REPOSITORY}/releases"
         exit 1
     fi
 
+    IFS=$'\t' read -r release_url release_draft <<<"$release_info"
+    release_type="published"
+    if [[ "$release_draft" == "true" ]]; then
+        release_type="draft"
+    fi
+    log "Resolved tag ${tag} to ${release_type} release ${release_url}"
+
     release_lines+="- ${package_name} ${version}: ${release_url}"$'\n'
-done < <(printf '%s\n' "$release_plz_releases_json" | jq -c '.[]')
+done <<<"$release_entries"
 
 if [[ -z "$release_lines" ]]; then
-    echo "No release URLs found; skipping release PR comment"
+    log "No releases in release-plz output; skipping"
     exit 0
 fi
 
@@ -63,11 +91,13 @@ existing_comment_id="$(
 )"
 
 if [[ -n "$existing_comment_id" ]]; then
+    log "Updating draft-release comment on PR #${pr_number}"
     "$gh_bin" api \
         --method PATCH \
         "/repos/${GITHUB_REPOSITORY}/issues/comments/${existing_comment_id}" \
         -f body="$body" \
         >/dev/null
 else
+    log "Creating draft-release comment on PR #${pr_number}"
     "$gh_bin" pr comment "$pr_number" --body "$body"
 fi
