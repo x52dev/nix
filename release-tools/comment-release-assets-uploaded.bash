@@ -1,4 +1,5 @@
 set -eEuo pipefail
+shopt -s inherit_errexit
 
 release_plz_releases_json="${1:?release-plz releases JSON is required}"
 marker="<!-- x52-release-assets-uploaded -->"
