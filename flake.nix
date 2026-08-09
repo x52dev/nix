@@ -121,6 +121,16 @@
                   touch "$out"
                 '';
 
+            shellcheck =
+              pkgs.runCommand "check-shellcheck"
+                {
+                  nativeBuildInputs = [ pkgs.shellcheck ];
+                }
+                ''
+                  shellcheck ${./release-tools}/*.bash
+                  touch "$out"
+                '';
+
             formatting =
               pkgs.runCommand "check-formatting"
                 {
