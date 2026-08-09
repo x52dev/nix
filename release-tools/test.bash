@@ -1,4 +1,5 @@
 set -euo pipefail
+shopt -s inherit_errexit
 
 test_root="$(mktemp -d)"
 trap 'rm -rf "$test_root"' EXIT
@@ -36,6 +37,7 @@ EOF
 printf '#!%s\n' "$bash_bin" >"$fake_bin/cargo"
 cat >>"$fake_bin/cargo" <<'EOF'
 set -euo pipefail
+shopt -s inherit_errexit
 [[ "$*" == "metadata --format-version=1 --no-deps" ]]
 printf '{"packages":[{"name":"demo","manifest_path":"%s/Cargo.toml"}]}\n' "$FIXTURE_ROOT"
 EOF
@@ -43,6 +45,7 @@ EOF
 printf '#!%s\n' "$bash_bin" >"$fake_bin/gh"
 cat >>"$fake_bin/gh" <<'EOF'
 set -euo pipefail
+shopt -s inherit_errexit
 printf 'gh' >>"$COMMAND_LOG"
 printf ' <%s>' "$@" >>"$COMMAND_LOG"
 printf '\n' >>"$COMMAND_LOG"
@@ -84,6 +87,7 @@ EOF
 printf '#!%s\n' "$bash_bin" >"$fake_bin/git"
 cat >>"$fake_bin/git" <<'EOF'
 set -euo pipefail
+shopt -s inherit_errexit
 if [[ "$*" == "diff --cached --quiet" ]]; then
     exit 1
 fi

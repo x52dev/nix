@@ -1,4 +1,5 @@
 set -eEuo pipefail
+shopt -s inherit_errexit
 
 release_plz_releases_json="${RELEASE_PLZ_RELEASES_JSON:?RELEASE_PLZ_RELEASES_JSON is required}"
 cargo_bin="${X52_CARGO:-cargo}"

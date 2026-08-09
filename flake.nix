@@ -52,7 +52,7 @@
               pkgs.gnused
               pkgs.jq
             ];
-            text = builtins.readFile ./release-tools/bump-changelogs.sh;
+            text = builtins.readFile ./release-tools/bump-changelogs.bash;
           };
 
           x52-update-release-notes = pkgs.writeShellApplication {
@@ -64,7 +64,7 @@
               pkgs.git
               pkgs.jq
             ];
-            text = builtins.readFile ./release-tools/update-release-notes.sh;
+            text = builtins.readFile ./release-tools/update-release-notes.bash;
           };
 
           x52-comment-release-pr = pkgs.writeShellApplication {
@@ -74,7 +74,7 @@
               pkgs.gh
               pkgs.jq
             ];
-            text = builtins.readFile ./release-tools/comment-release-pr.sh;
+            text = builtins.readFile ./release-tools/comment-release-pr.bash;
           };
 
           x52-comment-release-assets-uploaded = pkgs.writeShellApplication {
@@ -84,7 +84,7 @@
               pkgs.gh
               pkgs.jq
             ];
-            text = builtins.readFile ./release-tools/comment-release-assets-uploaded.sh;
+            text = builtins.readFile ./release-tools/comment-release-assets-uploaded.bash;
           };
 
           x52-release-tools = pkgs.symlinkJoin {
@@ -117,7 +117,7 @@
                   BASH_BIN = "${pkgs.bash}/bin/bash";
                 }
                 ''
-                  bash ${./release-tools/test.sh}
+                  bash ${./release-tools/test.bash}
                   touch "$out"
                 '';
 
