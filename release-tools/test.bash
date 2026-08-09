@@ -160,10 +160,6 @@ shopt -s inherit_errexit
 if [[ "$*" == "diff --cached --quiet" || "$*" == *"diff --quiet --"* ]]; then
     exit 1
 fi
-if [[ "$*" == *"push --set-upstream origin release/homebrew-"* ]]; then
-    credential_helper="credential.helper=!${X52_GH} auth git-credential"
-    [[ "$*" == *"-c credential.helper= -c $credential_helper"* ]]
-fi
 printf 'git' >>"$COMMAND_LOG"
 printf ' <%s>' "$@" >>"$COMMAND_LOG"
 printf '\n' >>"$COMMAND_LOG"
@@ -293,7 +289,11 @@ grep -Fq 'assert_match "custom test", shell_output("#{bin}/demo-formula verify")
 grep -Fq '# x52-release-tools: begin macos artifacts' "$tap_root/Formula/demo-formula.rb"
 grep -Fq 'gh <pr> <create> <--repo> <example/tap> <--base> <release> <--head> <release/homebrew-demo-formula-1.1.0>' "$command_log"
 grep -Fq 'git <-C> <'"$tap_root"'> <commit> <-m> <chore: update demo-formula to 1.1.0>' "$command_log"
-grep -Fq 'git <-c> <credential.helper=> <-c> <credential.helper=!'"$fake_bin"'/gh auth git-credential> <-C> <'"$tap_root"'> <push> <--set-upstream> <origin> <release/homebrew-demo-formula-1.1.0>' "$command_log"
+grep -Fq 'git <-C> <'"$tap_root"'> <push> <--set-upstream> <origin> <release/homebrew-demo-formula-1.1.0>' "$command_log"
+if grep -Fq 'gh <auth> <setup-git>' "$command_log"; then
+    echo "Expected the updater to use the tap checkout's Git credentials" >&2
+    exit 1
+fi
 
 x52-update-homebrew-tap \
     --tag demo-v1.2.0 \
@@ -311,6 +311,17 @@ grep -Fq 'sha256 "manual-linux-intel-checksum"' "$tap_root/Formula/manual-demo.r
 grep -Fq 'assert_match "manual test", shell_output("#{bin}/manual-demo verify")' "$tap_root/Formula/manual-demo.rb"
 grep -Fq '# x52-release-tools: begin macos artifacts' "$tap_root/Formula/manual-demo.rb"
 grep -Fq '# x52-release-tools: begin linux artifacts' "$tap_root/Formula/manual-demo.rb"
+
+unset X52_HOMEBREW_TAP_DIRECTORY
+if x52-update-homebrew-tap \
+    --tag demo-v1.2.0 \
+    --version 1.2.0 \
+    --package manual-release \
+    --source-repository example/manual >"$test_root/missing-tap-directory.log" 2>&1; then
+    echo "Expected a missing Homebrew tap checkout to fail" >&2
+    exit 1
+fi
+grep -Fq -- '--tap-directory or X52_HOMEBREW_TAP_DIRECTORY is required' "$test_root/missing-tap-directory.log"
 
 cat >"$fixture_root/CHANGELOG.md" <<'EOF'
 # Changelog
