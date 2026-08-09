@@ -7,6 +7,7 @@ fixture_root="$test_root/project"
 fake_bin="$test_root/bin"
 command_log="$test_root/commands.log"
 comment_log="$test_root/comments.log"
+release_attempts_file="$test_root/release-attempts"
 bash_bin="${BASH_BIN:?BASH_BIN is required}"
 mkdir -p "$fixture_root" "$fake_bin"
 
@@ -51,7 +52,15 @@ case "$*" in
         printf '42\n'
         ;;
     *'/releases?per_page=100'*)
-        if [[ "${RELEASE_FOUND:-true}" == "true" ]]; then
+        release_attempt=1
+        if [[ -n "${RELEASE_ATTEMPTS_FILE:-}" ]]; then
+            if [[ -f "$RELEASE_ATTEMPTS_FILE" ]]; then
+                release_attempt="$(<"$RELEASE_ATTEMPTS_FILE")"
+                release_attempt=$((release_attempt + 1))
+            fi
+            printf '%s\n' "$release_attempt" >"$RELEASE_ATTEMPTS_FILE"
+        fi
+        if [[ "${RELEASE_FOUND:-true}" == "true" && "$release_attempt" -ge "${RELEASE_AVAILABLE_AT_ATTEMPT:-1}" ]]; then
             printf '[{"tag_name":"other-v1.0.0","draft":false,"html_url":"https://github.com/example/demo/releases/tag/other-v1.0.0"}]\n'
             printf '[{"tag_name":"demo-v1.1.0","draft":true,"html_url":"https://github.com/example/demo/releases/tag/untagged-draft-release"},{"tag_name":"other-v1.1.0","draft":false,"html_url":"https://github.com/example/demo/releases/tag/other-v1.1.0"}]\n'
         else
@@ -62,6 +71,14 @@ case "$*" in
         printf '%s\n' "${EXISTING_COMMENT_ID:-}"
         ;;
 esac
+EOF
+
+printf '#!%s\n' "$bash_bin" >"$fake_bin/sleep"
+cat >>"$fake_bin/sleep" <<'EOF'
+set -euo pipefail
+printf 'sleep' >>"$COMMAND_LOG"
+printf ' <%s>' "$@" >>"$COMMAND_LOG"
+printf '\n' >>"$COMMAND_LOG"
 EOF
 
 printf '#!%s\n' "$bash_bin" >"$fake_bin/git"
@@ -75,13 +92,14 @@ printf ' <%s>' "$@" >>"$COMMAND_LOG"
 printf '\n' >>"$COMMAND_LOG"
 EOF
 
-chmod +x "$fake_bin/cargo" "$fake_bin/gh" "$fake_bin/git"
+chmod +x "$fake_bin/cargo" "$fake_bin/gh" "$fake_bin/git" "$fake_bin/sleep"
 
 export COMMAND_LOG="$command_log"
 export FIXTURE_ROOT="$fixture_root"
 export X52_CARGO="$fake_bin/cargo"
 export X52_GH="$fake_bin/gh"
 export X52_GIT="$fake_bin/git"
+export X52_SLEEP="$fake_bin/sleep"
 
 cd "$fixture_root"
 
@@ -161,7 +179,18 @@ export RELEASE_PLZ_RELEASES_JSON='[{"package_name":"demo","version":"1.1.0","tag
 x52-comment-release-pr "$RELEASE_PLZ_RELEASES_JSON" deadbeef >>"$comment_log"
 x52-comment-release-assets-uploaded "$RELEASE_PLZ_RELEASES_JSON" deadbeef >>"$comment_log"
 
-[[ "$(grep -Fc 'gh <api> <--paginate> </repos/example/demo/releases?per_page=100>' "$command_log")" == 8 ]]
+[[ "$(grep -Fc 'gh <api> <--paginate> </repos/example/demo/releases?per_page=100>' "$command_log")" == 16 ]]
+
+export RELEASE_ATTEMPTS_FILE="$release_attempts_file"
+export RELEASE_AVAILABLE_AT_ATTEMPT=2
+RUNNER_DEBUG=1 x52-comment-release-assets-uploaded "$RELEASE_PLZ_RELEASES_JSON" deadbeef >>"$comment_log"
+
+[[ "$(<"$release_attempts_file")" == 2 ]]
+grep -Fq 'No release with tag demo-v1.1.0 was returned by /repos/example/demo/releases; retrying in 1s' "$comment_log"
+grep -Fq 'GitHub releases API response:' "$comment_log"
+grep -Fq '"tag_name": "demo-v1.1.0"' "$comment_log"
+[[ "$(grep -Fc 'sleep <1>' "$command_log")" == 3 ]]
+[[ "$(grep -Fc 'gh <api> <--paginate> </repos/example/demo/releases?per_page=100>' "$command_log")" == 18 ]]
 
 cat >"$fixture_root/CHANGELOG.md" <<'EOF'
 # Changelog
