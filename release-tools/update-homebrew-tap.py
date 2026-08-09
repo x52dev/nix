@@ -218,12 +218,19 @@ def download_checksums(gh: str, source_repository: str, release: Release, asset_
         for os_name in operating_systems:
             for _, target in ARTIFACT_TARGETS[os_name]:
                 archive = f"{asset_prefix}-{target}.tar.gz"
-                checksum_name = f"{archive}.sha256"
-                run(gh, "release", "download", release.tag, "--repo", source_repository, "--pattern", checksum_name, "--dir", str(checksum_directory))
-                checksum = (checksum_directory / checksum_name).read_text().split(maxsplit=1)[0]
-                if not checksum:
-                    raise UpdateError(f"Release checksum for {archive} is empty")
-                checksums[target] = checksum
+                checksum_names = (f"{archive}.sha256", f"{archive.removesuffix('.tar.gz')}.sha256")
+                for checksum_name in checksum_names:
+                    result = run(gh, "release", "download", release.tag, "--repo", source_repository, "--pattern", checksum_name, "--dir", str(checksum_directory), check=False)
+                    checksum_path = checksum_directory / checksum_name
+                    if result.returncode or not checksum_path.is_file():
+                        continue
+                    checksum_words = checksum_path.read_text().split(maxsplit=1)
+                    if not checksum_words:
+                        raise UpdateError(f"Release checksum for {archive} is empty")
+                    checksums[target] = checksum_words[0]
+                    break
+                else:
+                    raise UpdateError(f"Could not download a release checksum for {archive}")
     return checksums
 
 

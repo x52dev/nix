@@ -117,8 +117,10 @@ case "$*" in
         printf '%s\n' "${EXISTING_COMMENT_ID:-}"
         ;;
     'release download demo-v1.1.0 --repo example/source --pattern demo-asset-aarch64-apple-darwin.tar.gz.sha256 --dir '*)
+        ;;
+    'release download demo-v1.1.0 --repo example/source --pattern demo-asset-aarch64-apple-darwin.sha256 --dir '*)
         checksum_dir="${*: -1}"
-        printf 'arm-checksum  demo-asset-aarch64-apple-darwin.tar.gz\n' >"$checksum_dir/demo-asset-aarch64-apple-darwin.tar.gz.sha256"
+        printf 'arm-checksum  demo-asset-aarch64-apple-darwin.tar.gz\n' >"$checksum_dir/demo-asset-aarch64-apple-darwin.sha256"
         ;;
     'release download demo-v1.1.0 --repo example/source --pattern demo-asset-x86_64-apple-darwin.tar.gz.sha256 --dir '*)
         checksum_dir="${*: -1}"

@@ -125,10 +125,10 @@ x52-comment-release-assets-uploaded "$RELEASE_PLZ_RELEASES_JSON"
 Both commands accept an optional second argument for the merge commit SHA. Without it, they use `GITHUB_SHA`.
 
 `x52-update-homebrew-tap` selects one released binary package, then expects assets named
-`<package>-<target>.tar.gz.sha256` for each generated OS artifact block. macOS uses
-the `aarch64-apple-darwin` and `x86_64-apple-darwin` targets; Linux uses
-`aarch64-unknown-linux-gnu` and `x86_64-unknown-linux-gnu`. `GH_TOKEN` must have
-write access to `x52dev/homebrew-tap`. The command uses the
+`<package>-<target>.tar.gz.sha256` or `<package>-<target>.sha256` for each generated
+OS artifact block. macOS uses the `aarch64-apple-darwin` and `x86_64-apple-darwin`
+targets; Linux uses `aarch64-unknown-linux-gnu` and `x86_64-unknown-linux-gnu`.
+`GH_TOKEN` must have write access to `x52dev/homebrew-tap`. The command uses the
 `release/homebrew-<formula>-<version>` branch and makes retries reuse it.
 
 ```sh
