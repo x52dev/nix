@@ -5,12 +5,13 @@ test_root="$(mktemp -d)"
 trap 'rm -rf "$test_root"' EXIT
 
 fixture_root="$test_root/project"
+tap_root="$test_root/homebrew-tap"
 fake_bin="$test_root/bin"
 command_log="$test_root/commands.log"
 comment_log="$test_root/comments.log"
 release_attempts_file="$test_root/release-attempts"
 bash_bin="${BASH_BIN:?BASH_BIN is required}"
-mkdir -p "$fixture_root" "$fake_bin"
+mkdir -p "$fixture_root" "$tap_root/Formula" "$fake_bin"
 
 cat >"$fixture_root/Cargo.toml" <<'EOF'
 [package]
@@ -34,12 +35,54 @@ cat >"$fixture_root/README.md" <<'EOF'
 See https://docs.rs/demo/1.0.0/demo/ for documentation.
 EOF
 
+cat >"$tap_root/Formula/demo-formula.rb" <<'EOF'
+class Demo < Formula
+  # x52-release-tools: begin metadata
+  stale metadata
+  # x52-release-tools: end metadata
+
+  on_macos do
+    # x52-release-tools: begin macOS artifacts
+    stale macOS artifacts
+    # x52-release-tools: end macOS artifacts
+
+    test do
+      assert_match "custom test", shell_output("#{bin}/demo-formula verify")
+    end
+  end
+end
+EOF
+
+cat >"$tap_root/Formula/manual-demo.rb" <<'EOF'
+class ManualDemo < Formula
+  # x52-release-tools: begin version
+  version "1.0.0"
+  # x52-release-tools: end version
+
+  on_macos do
+    # x52-release-tools: begin MACOS artifacts
+    stale macOS artifacts
+    # x52-release-tools: end MACOS artifacts
+  end
+
+  on_linux do
+    # x52-release-tools: begin LiNuX artifacts
+    stale Linux artifacts
+    # x52-release-tools: end LiNuX artifacts
+
+    test do
+      assert_match "manual test", shell_output("#{bin}/manual-demo verify")
+    end
+  end
+end
+EOF
+
 printf '#!%s\n' "$bash_bin" >"$fake_bin/cargo"
 cat >>"$fake_bin/cargo" <<'EOF'
 set -euo pipefail
 shopt -s inherit_errexit
 [[ "$*" == "metadata --format-version=1 --no-deps" ]]
-printf '{"packages":[{"name":"demo","manifest_path":"%s/Cargo.toml"}]}\n' "$FIXTURE_ROOT"
+printf '%s\n' "{\"packages\":[{\"name\":\"demo\",\"version\":\"1.1.0\",\"description\":\"Demo \\\"CLI\\\"\",\"homepage\":null,\"repository\":\"https://github.com/example/source\",\"license\":\"MIT OR Apache-2.0\",\"manifest_path\":\"${FIXTURE_ROOT}/Cargo.toml\"},{\"name\":\"manual-release\",\"version\":\"1.2.0\",\"description\":\"Manual demo\",\"homepage\":\"https://example.com/manual\",\"repository\":null,\"license\":\"MIT\",\"manifest_path\":\"${FIXTURE_ROOT}/Cargo.toml\"}]}"
 EOF
 
 printf '#!%s\n' "$bash_bin" >"$fake_bin/gh"
@@ -73,6 +116,30 @@ case "$*" in
     *'/issues/'*'/comments'*)
         printf '%s\n' "${EXISTING_COMMENT_ID:-}"
         ;;
+    'release download demo-v1.1.0 --repo example/source --pattern demo-asset-aarch64-apple-darwin.tar.gz.sha256 --dir '*)
+        checksum_dir="${*: -1}"
+        printf 'arm-checksum  demo-asset-aarch64-apple-darwin.tar.gz\n' >"$checksum_dir/demo-asset-aarch64-apple-darwin.tar.gz.sha256"
+        ;;
+    'release download demo-v1.1.0 --repo example/source --pattern demo-asset-x86_64-apple-darwin.tar.gz.sha256 --dir '*)
+        checksum_dir="${*: -1}"
+        printf 'intel-checksum  demo-asset-x86_64-apple-darwin.tar.gz\n' >"$checksum_dir/demo-asset-x86_64-apple-darwin.tar.gz.sha256"
+        ;;
+    'release download demo-v1.2.0 --repo example/manual --pattern manual-asset-aarch64-apple-darwin.tar.gz.sha256 --dir '*)
+        checksum_dir="${*: -1}"
+        printf 'manual-arm-checksum  manual-asset-aarch64-apple-darwin.tar.gz\n' >"$checksum_dir/manual-asset-aarch64-apple-darwin.tar.gz.sha256"
+        ;;
+    'release download demo-v1.2.0 --repo example/manual --pattern manual-asset-x86_64-apple-darwin.tar.gz.sha256 --dir '*)
+        checksum_dir="${*: -1}"
+        printf 'manual-intel-checksum  manual-asset-x86_64-apple-darwin.tar.gz\n' >"$checksum_dir/manual-asset-x86_64-apple-darwin.tar.gz.sha256"
+        ;;
+    'release download demo-v1.2.0 --repo example/manual --pattern manual-asset-aarch64-unknown-linux-gnu.tar.gz.sha256 --dir '*)
+        checksum_dir="${*: -1}"
+        printf 'manual-linux-arm-checksum  manual-asset-aarch64-unknown-linux-gnu.tar.gz\n' >"$checksum_dir/manual-asset-aarch64-unknown-linux-gnu.tar.gz.sha256"
+        ;;
+    'release download demo-v1.2.0 --repo example/manual --pattern manual-asset-x86_64-unknown-linux-gnu.tar.gz.sha256 --dir '*)
+        checksum_dir="${*: -1}"
+        printf 'manual-linux-intel-checksum  manual-asset-x86_64-unknown-linux-gnu.tar.gz\n' >"$checksum_dir/manual-asset-x86_64-unknown-linux-gnu.tar.gz.sha256"
+        ;;
 esac
 EOF
 
@@ -88,7 +155,7 @@ printf '#!%s\n' "$bash_bin" >"$fake_bin/git"
 cat >>"$fake_bin/git" <<'EOF'
 set -euo pipefail
 shopt -s inherit_errexit
-if [[ "$*" == "diff --cached --quiet" ]]; then
+if [[ "$*" == "diff --cached --quiet" || "$*" == *"diff --quiet --"* ]]; then
     exit 1
 fi
 printf 'git' >>"$COMMAND_LOG"
@@ -104,6 +171,7 @@ export X52_CARGO="$fake_bin/cargo"
 export X52_GH="$fake_bin/gh"
 export X52_GIT="$fake_bin/git"
 export X52_SLEEP="$fake_bin/sleep"
+export X52_HOMEBREW_TAP_DIRECTORY="$tap_root"
 
 cd "$fixture_root"
 
@@ -195,6 +263,47 @@ grep -Fq 'GitHub releases API response:' "$comment_log"
 grep -Fq '"tag_name": "demo-v1.1.0"' "$comment_log"
 [[ "$(grep -Fc 'sleep <1>' "$command_log")" == 3 ]]
 [[ "$(grep -Fc 'gh <api> <--paginate> </repos/example/demo/releases?per_page=100>' "$command_log")" == 18 ]]
+
+RUNNER_DEBUG=1 x52-update-homebrew-tap \
+    --releases "$RELEASE_PLZ_RELEASES_JSON" \
+    --package demo \
+    --formula demo-formula \
+    --asset-prefix demo-asset \
+    --source-repository example/source \
+    --tap example/tap \
+    --base release >"$test_root/homebrew-updater.log"
+
+grep -Fq 'x52-update-homebrew-tap: Updating demo-formula to 1.1.0 from example/source release demo-v1.1.0' "$test_root/homebrew-updater.log"
+grep -Fq 'x52-update-homebrew-tap: Downloading release checksums for macos' "$test_root/homebrew-updater.log"
+grep -Fq 'x52-update-homebrew-tap: Running '"$fake_bin"'/gh release download demo-v1.1.0 --repo example/source' "$test_root/homebrew-updater.log"
+grep -Fq 'x52-update-homebrew-tap: Creating pull request in example/tap' "$test_root/homebrew-updater.log"
+grep -Fq 'version "1.1.0"' "$tap_root/Formula/demo-formula.rb"
+grep -Fq 'sha256 "arm-checksum"' "$tap_root/Formula/demo-formula.rb"
+grep -Fq 'sha256 "intel-checksum"' "$tap_root/Formula/demo-formula.rb"
+grep -Fq 'desc "Demo \"CLI\""' "$tap_root/Formula/demo-formula.rb"
+grep -Fq 'homepage "https://github.com/example/source"' "$tap_root/Formula/demo-formula.rb"
+grep -Fq 'license "MIT OR Apache-2.0"' "$tap_root/Formula/demo-formula.rb"
+grep -Fq 'assert_match "custom test", shell_output("#{bin}/demo-formula verify")' "$tap_root/Formula/demo-formula.rb"
+grep -Fq '# x52-release-tools: begin macos artifacts' "$tap_root/Formula/demo-formula.rb"
+grep -Fq 'gh <pr> <create> <--repo> <example/tap> <--base> <release> <--head> <release/homebrew-demo-formula-1.1.0>' "$command_log"
+grep -Fq 'git <-C> <'"$tap_root"'> <commit> <-m> <chore: update demo-formula to 1.1.0>' "$command_log"
+
+x52-update-homebrew-tap \
+    --tag demo-v1.2.0 \
+    --version 1.2.0 \
+    --package manual-release \
+    --formula manual-demo \
+    --asset-prefix manual-asset \
+    --source-repository example/manual
+
+grep -Fq 'version "1.2.0"' "$tap_root/Formula/manual-demo.rb"
+grep -Fq 'sha256 "manual-arm-checksum"' "$tap_root/Formula/manual-demo.rb"
+grep -Fq 'sha256 "manual-intel-checksum"' "$tap_root/Formula/manual-demo.rb"
+grep -Fq 'sha256 "manual-linux-arm-checksum"' "$tap_root/Formula/manual-demo.rb"
+grep -Fq 'sha256 "manual-linux-intel-checksum"' "$tap_root/Formula/manual-demo.rb"
+grep -Fq 'assert_match "manual test", shell_output("#{bin}/manual-demo verify")' "$tap_root/Formula/manual-demo.rb"
+grep -Fq '# x52-release-tools: begin macos artifacts' "$tap_root/Formula/manual-demo.rb"
+grep -Fq '# x52-release-tools: begin linux artifacts' "$tap_root/Formula/manual-demo.rb"
 
 cat >"$fixture_root/CHANGELOG.md" <<'EOF'
 # Changelog

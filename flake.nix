@@ -87,6 +87,18 @@
             text = builtins.readFile ./release-tools/comment-release-assets-uploaded.bash;
           };
 
+          x52-update-homebrew-tap = pkgs.writeShellApplication {
+            name = "x52-update-homebrew-tap";
+            runtimeInputs = [
+              pkgs.gh
+              pkgs.git
+              pkgs.python3
+            ];
+            text = ''
+              exec python ${./release-tools/update-homebrew-tap.py} "$@"
+            '';
+          };
+
           x52-release-tools = pkgs.symlinkJoin {
             name = "x52-release-tools";
             paths = [
@@ -94,6 +106,7 @@
               x52-update-release-notes
               x52-comment-release-pr
               x52-comment-release-assets-uploaded
+              x52-update-homebrew-tap
             ];
           };
         in
