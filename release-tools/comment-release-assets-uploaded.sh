@@ -32,7 +32,17 @@ while read -r release; do
     tag="$(printf '%s\n' "$release" | jq -r '.tag')"
     version="$(printf '%s\n' "$release" | jq -r '.version')"
     package_name="$(printf '%s\n' "$release" | jq -r '.package_name')"
-    release_url="$("$gh_bin" release view "$tag" --json url --jq '.url')"
+    release_url="$(
+        "$gh_bin" api --paginate \
+            "/repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+            | jq -r --arg tag "$tag" \
+                '[.[] | select(.tag_name == $tag)] | first | .html_url // empty'
+    )"
+
+    if [[ -z "$release_url" ]]; then
+        echo "Release for tag ${tag} not found"
+        exit 1
+    fi
 
     release_lines+="- ${package_name} ${version}: ${release_url}"$'\n'
 done < <(printf '%s\n' "$release_plz_releases_json" | jq -c '.[]')

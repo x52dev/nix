@@ -49,8 +49,8 @@ case "$*" in
     *'/commits/'*'/pulls'*)
         printf '42\n'
         ;;
-    'release view demo-v1.1.0 --json url --jq .url')
-        printf 'https://github.com/example/demo/releases/tag/demo-v1.1.0\n'
+    *'/releases?per_page=100'*)
+        printf '[{"tag_name":"demo-v1.1.0","draft":true,"html_url":"https://github.com/example/demo/releases/tag/untagged-draft-release"}]\n'
         ;;
     *'/issues/'*'/comments'*)
         printf '%s\n' "${EXISTING_COMMENT_ID:-}"
@@ -115,6 +115,8 @@ x52-comment-release-assets-uploaded "$RELEASE_PLZ_RELEASES_JSON" deadbeef
 
 grep -Fq 'gh <pr> <comment> <42> <--body> <<!-- x52-draft-release-link -->' "$command_log"
 grep -Fq 'gh <pr> <comment> <42> <--body> <<!-- x52-release-assets-uploaded -->' "$command_log"
+[[ "$(grep -Fc 'gh <api> <--paginate> </repos/example/demo/releases?per_page=100>' "$command_log")" == 2 ]]
+grep -Fq 'untagged-draft-release' "$command_log"
 
 export EXISTING_COMMENT_ID=99
 x52-comment-release-pr "$RELEASE_PLZ_RELEASES_JSON" deadbeef
