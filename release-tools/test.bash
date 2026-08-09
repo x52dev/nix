@@ -160,6 +160,10 @@ shopt -s inherit_errexit
 if [[ "$*" == "diff --cached --quiet" || "$*" == *"diff --quiet --"* ]]; then
     exit 1
 fi
+if [[ "$*" == *"push --set-upstream origin release/homebrew-"* ]]; then
+    credential_helper="credential.helper=!${X52_GH} auth git-credential"
+    [[ "$*" == *"-c credential.helper= -c $credential_helper"* ]]
+fi
 printf 'git' >>"$COMMAND_LOG"
 printf ' <%s>' "$@" >>"$COMMAND_LOG"
 printf '\n' >>"$COMMAND_LOG"
@@ -289,6 +293,7 @@ grep -Fq 'assert_match "custom test", shell_output("#{bin}/demo-formula verify")
 grep -Fq '# x52-release-tools: begin macos artifacts' "$tap_root/Formula/demo-formula.rb"
 grep -Fq 'gh <pr> <create> <--repo> <example/tap> <--base> <release> <--head> <release/homebrew-demo-formula-1.1.0>' "$command_log"
 grep -Fq 'git <-C> <'"$tap_root"'> <commit> <-m> <chore: update demo-formula to 1.1.0>' "$command_log"
+grep -Fq 'git <-c> <credential.helper=> <-c> <credential.helper=!'"$fake_bin"'/gh auth git-credential> <-C> <'"$tap_root"'> <push> <--set-upstream> <origin> <release/homebrew-demo-formula-1.1.0>' "$command_log"
 
 x52-update-homebrew-tap \
     --tag demo-v1.2.0 \

@@ -58,6 +58,11 @@ def run(*command: str, cwd: Path | None = None, check: bool = True) -> subproces
     return result
 
 
+def run_authenticated_git(git: str, gh: str, *command: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+    credential_helper = f"!{shlex.quote(gh)} auth git-credential"
+    return run(git, "-c", "credential.helper=", "-c", f"credential.helper={credential_helper}", *command, check=check)
+
+
 def ruby_string(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 
@@ -279,8 +284,7 @@ def main() -> int:
             gh = os.environ.get("X52_GH", "gh")
             git = os.environ.get("X52_GIT", "git")
             log(f"Cloning Homebrew tap {args.tap}")
-            run(gh, "auth", "setup-git")
-            run(git, "clone", f"https://github.com/{args.tap}.git", str(tap_directory))
+            run_authenticated_git(git, gh, "clone", f"https://github.com/{args.tap}.git", str(tap_directory))
 
         formula = tap_directory / "Formula" / f"{formula_name}.rb"
         if not formula.is_file():
@@ -289,9 +293,9 @@ def main() -> int:
         git = os.environ.get("X52_GIT", "git")
         gh = os.environ.get("X52_GH", "gh")
         branch = f"release/homebrew-{formula_name}-{release.version}"
-        if run(git, "-C", str(tap_directory), "ls-remote", "--exit-code", "--heads", "origin", branch, check=False).returncode == 0:
+        if run_authenticated_git(git, gh, "-C", str(tap_directory), "ls-remote", "--exit-code", "--heads", "origin", branch, check=False).returncode == 0:
             log(f"Reusing tap branch {branch}")
-            run(git, "-C", str(tap_directory), "fetch", "origin", branch)
+            run_authenticated_git(git, gh, "-C", str(tap_directory), "fetch", "origin", branch)
             run(git, "-C", str(tap_directory), "switch", "--track", f"origin/{branch}")
         else:
             log(f"Creating tap branch {branch}")
@@ -314,7 +318,7 @@ def main() -> int:
         run(git, "-C", str(tap_directory), "add", f"Formula/{formula_name}.rb")
         run(git, "-C", str(tap_directory), "commit", "-m", f"chore: update {formula_name} to {release.version}")
         log(f"Pushing tap branch {branch}")
-        run(git, "-C", str(tap_directory), "push", "--set-upstream", "origin", branch)
+        run_authenticated_git(git, gh, "-C", str(tap_directory), "push", "--set-upstream", "origin", branch)
         log(f"Creating pull request in {args.tap}")
         run(gh, "pr", "create", "--repo", args.tap, "--base", args.base, "--head", branch, "--title", f"chore: update {formula_name} to {release.version}", "--body", f"Automated update from {args.source_repository} release {release.tag}.")
         return 0
