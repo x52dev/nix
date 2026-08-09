@@ -4,6 +4,8 @@ release_plz_releases_json="${1:?release-plz releases JSON is required}"
 marker="<!-- x52-release-assets-uploaded -->"
 commit_sha="${2:-${GITHUB_SHA:-}}"
 gh_bin="${X52_GH:-gh}"
+sleep_bin="${X52_SLEEP:-sleep}"
+max_release_lookup_attempts=5
 
 log() {
     echo "x52-comment-release-assets-uploaded: $*"
@@ -32,14 +34,6 @@ if ! release_entries="$(
     exit 1
 fi
 
-log "Fetching releases from /repos/${GITHUB_REPOSITORY}/releases"
-if ! releases_json="$(
-    "$gh_bin" api --paginate "/repos/${GITHUB_REPOSITORY}/releases?per_page=100"
-)"; then
-    log "Failed to fetch releases from /repos/${GITHUB_REPOSITORY}/releases"
-    exit 1
-fi
-
 pr_number="$(
     "$gh_bin" api \
         "/repos/${GITHUB_REPOSITORY}/commits/${commit_sha}/pulls" \
@@ -53,33 +47,63 @@ fi
 
 log "Resolved commit ${commit_sha} to merged PR #${pr_number}"
 
-release_lines=""
+release_lookup_delay=1
+for ((release_lookup_attempt = 1; release_lookup_attempt <= max_release_lookup_attempts; release_lookup_attempt++)); do
+    log "Fetching releases from /repos/${GITHUB_REPOSITORY}/releases (attempt ${release_lookup_attempt}/${max_release_lookup_attempts})"
+    if ! releases_json="$(
+        "$gh_bin" api --paginate "/repos/${GITHUB_REPOSITORY}/releases?per_page=100"
+    )"; then
+        retry_reason="Failed to fetch releases from /repos/${GITHUB_REPOSITORY}/releases"
+    else
+        if [[ "${RUNNER_DEBUG:-}" == "1" ]]; then
+            log "GitHub releases API response:"
+            printf '%s\n' "$releases_json" | jq -s .
+        fi
 
-while read -r release; do
-    tag="$(printf '%s\n' "$release" | jq -r '.tag')"
-    version="$(printf '%s\n' "$release" | jq -r '.version')"
-    package_name="$(printf '%s\n' "$release" | jq -r '.package_name')"
-    log "Resolving release tag ${tag}"
-    release_info="$(
-        printf '%s\n' "$releases_json" | jq -s -r --arg tag "$tag" \
-            '([.[][] | select(.tag_name == $tag)] | first) as $release
-            | if $release == null then empty else [$release.html_url, $release.draft] | @tsv end'
-    )"
+        release_lines=""
+        missing_tag=""
+        while read -r release; do
+            tag="$(printf '%s\n' "$release" | jq -r '.tag')"
+            version="$(printf '%s\n' "$release" | jq -r '.version')"
+            package_name="$(printf '%s\n' "$release" | jq -r '.package_name')"
+            log "Resolving release tag ${tag}"
+            release_info="$(
+                printf '%s\n' "$releases_json" | jq -s -r --arg tag "$tag" \
+                    '([.[][] | select(.tag_name == $tag)] | first) as $release
+                    | if $release == null then empty else [$release.html_url, $release.draft] | @tsv end'
+            )"
 
-    if [[ -z "$release_info" ]]; then
-        log "No release with tag ${tag} was returned by /repos/${GITHUB_REPOSITORY}/releases"
+            if [[ -z "$release_info" ]]; then
+                missing_tag="$tag"
+                break
+            fi
+
+            IFS=$'\t' read -r release_url release_draft <<<"$release_info"
+            release_type="published"
+            if [[ "$release_draft" == "true" ]]; then
+                release_type="draft"
+            fi
+            log "Resolved tag ${tag} to ${release_type} release ${release_url}"
+
+            release_lines+="- ${package_name} ${version}: ${release_url}"$'\n'
+        done <<<"$release_entries"
+
+        if [[ -z "$missing_tag" ]]; then
+            break
+        fi
+
+        retry_reason="No release with tag ${missing_tag} was returned by /repos/${GITHUB_REPOSITORY}/releases"
+    fi
+
+    if (( release_lookup_attempt == max_release_lookup_attempts )); then
+        log "$retry_reason"
         exit 1
     fi
 
-    IFS=$'\t' read -r release_url release_draft <<<"$release_info"
-    release_type="published"
-    if [[ "$release_draft" == "true" ]]; then
-        release_type="draft"
-    fi
-    log "Resolved tag ${tag} to ${release_type} release ${release_url}"
-
-    release_lines+="- ${package_name} ${version}: ${release_url}"$'\n'
-done <<<"$release_entries"
+    log "${retry_reason}; retrying in ${release_lookup_delay}s"
+    "$sleep_bin" "$release_lookup_delay"
+    release_lookup_delay=$((release_lookup_delay * 2))
+done
 
 if [[ -z "$release_lines" ]]; then
     log "No releases in release-plz output; skipping"
