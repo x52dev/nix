@@ -21,6 +21,7 @@ Contains release-plz post-processing commands:
 - `x52-update-release-notes` copies the matching changelog sections into GitHub releases.
 - `x52-comment-release-pr` adds or updates a draft-release link comment on the merged release pull request.
 - `x52-comment-release-assets-uploaded` adds or updates a comment after the release assets are uploaded.
+- `x52-update-homebrew-tap` updates macOS checksums in `x52dev/homebrew-tap` and opens a formula pull request.
 
 The commands expect `cargo` to already be available. Git, GitHub CLI, jq, and the required shell utilities are supplied by the Nix package.
 
@@ -122,6 +123,59 @@ x52-comment-release-assets-uploaded "$RELEASE_PLZ_RELEASES_JSON"
 ```
 
 Both commands accept an optional second argument for the merge commit SHA. Without it, they use `GITHUB_SHA`.
+
+`x52-update-homebrew-tap` selects one released binary package, then expects assets named
+`<package>-<target>.tar.gz.sha256` for each generated OS artifact block. macOS uses
+the `aarch64-apple-darwin` and `x86_64-apple-darwin` targets; Linux uses
+`aarch64-unknown-linux-gnu` and `x86_64-unknown-linux-gnu`. `GH_TOKEN` must have
+write access to `x52dev/homebrew-tap`. The command uses the
+`release/homebrew-<formula>-<version>` branch and makes retries reuse it.
+
+```sh
+x52-update-homebrew-tap \
+  --releases "$RELEASE_PLZ_RELEASES_JSON" \
+  --package inspect-cert-chain
+```
+
+Use `--formula` when the formula name differs from the package name, and
+`--asset-prefix` when the release archive has another prefix. `--tap`, `--base`, and
+`--source-repository` override their defaults. For a manual repair, replace
+`--releases` with `--tag` and `--version`.
+
+The formula owns all behaviour outside generated markers. Use exactly one of these blocks:
+
+```ruby
+# x52-release-tools: begin version
+version "0.0.27"
+# x52-release-tools: end version
+```
+
+```ruby
+# x52-release-tools: begin metadata
+desc "..."
+homepage "..."
+version "0.0.27"
+license "..."
+# x52-release-tools: end metadata
+```
+
+`metadata` is read from the released Cargo package and requires its version to match the
+release version. Add one or both lower-case OS artifact blocks; the tool accepts existing
+marker spellings without regard to case and writes `macos` and `linux` consistently:
+
+```ruby
+# x52-release-tools: begin macos artifacts
+on_arm do
+  url "..."
+  sha256 "..."
+end
+
+on_intel do
+  url "..."
+  sha256 "..."
+end
+# x52-release-tools: end macos artifacts
+```
 
 ## Development
 
