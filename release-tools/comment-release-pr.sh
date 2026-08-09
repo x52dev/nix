@@ -32,6 +32,14 @@ if ! release_entries="$(
     exit 1
 fi
 
+log "Fetching releases from /repos/${GITHUB_REPOSITORY}/releases"
+if ! releases_json="$(
+    "$gh_bin" api --paginate "/repos/${GITHUB_REPOSITORY}/releases?per_page=100"
+)"; then
+    log "Failed to fetch releases from /repos/${GITHUB_REPOSITORY}/releases"
+    exit 1
+fi
+
 pr_number="$(
     "$gh_bin" api \
         "/repos/${GITHUB_REPOSITORY}/commits/${commit_sha}/pulls" \
@@ -53,11 +61,9 @@ while read -r release; do
     package_name="$(printf '%s\n' "$release" | jq -r '.package_name')"
     log "Resolving release tag ${tag}"
     release_info="$(
-        "$gh_bin" api --paginate \
-            "/repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
-            | jq -r --arg tag "$tag" \
-                '([.[] | select(.tag_name == $tag)] | first) as $release
-                | if $release == null then empty else [$release.html_url, $release.draft] | @tsv end'
+        printf '%s\n' "$releases_json" | jq -s -r --arg tag "$tag" \
+            '([.[][] | select(.tag_name == $tag)] | first) as $release
+            | if $release == null then empty else [$release.html_url, $release.draft] | @tsv end'
     )"
 
     if [[ -z "$release_info" ]]; then

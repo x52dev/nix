@@ -52,9 +52,10 @@ case "$*" in
         ;;
     *'/releases?per_page=100'*)
         if [[ "${RELEASE_FOUND:-true}" == "true" ]]; then
-            printf '[{"tag_name":"demo-v1.1.0","draft":true,"html_url":"https://github.com/example/demo/releases/tag/untagged-draft-release"}]\n'
+            printf '[{"tag_name":"other-v1.0.0","draft":false,"html_url":"https://github.com/example/demo/releases/tag/other-v1.0.0"}]\n'
+            printf '[{"tag_name":"demo-v1.1.0","draft":true,"html_url":"https://github.com/example/demo/releases/tag/untagged-draft-release"},{"tag_name":"other-v1.1.0","draft":false,"html_url":"https://github.com/example/demo/releases/tag/other-v1.1.0"}]\n'
         else
-            printf '[]\n'
+            printf '[]\n[]\n'
         fi
         ;;
     *'/issues/'*'/comments'*)
@@ -140,11 +141,27 @@ if x52-comment-release-pr '{"tag":"demo-v1.1.0"}' deadbeef >"$test_root/invalid-
 fi
 grep -Fq 'Invalid release-plz releases JSON' "$test_root/invalid-json.log"
 
-if RELEASE_FOUND=false x52-comment-release-assets-uploaded "$RELEASE_PLZ_RELEASES_JSON" deadbeef >"$test_root/missing-release.log" 2>&1; then
+if RELEASE_FOUND=false x52-comment-release-pr "$RELEASE_PLZ_RELEASES_JSON" deadbeef >"$test_root/missing-release-pr.log" 2>&1; then
     echo "Expected missing release to fail" >&2
     exit 1
+else
+    [[ "$?" == 1 ]]
 fi
-grep -Fq 'No release with tag demo-v1.1.0 was returned by /repos/example/demo/releases' "$test_root/missing-release.log"
+grep -Fq 'No release with tag demo-v1.1.0 was returned by /repos/example/demo/releases' "$test_root/missing-release-pr.log"
+
+if RELEASE_FOUND=false x52-comment-release-assets-uploaded "$RELEASE_PLZ_RELEASES_JSON" deadbeef >"$test_root/missing-release-assets.log" 2>&1; then
+    echo "Expected missing release to fail" >&2
+    exit 1
+else
+    [[ "$?" == 1 ]]
+fi
+grep -Fq 'No release with tag demo-v1.1.0 was returned by /repos/example/demo/releases' "$test_root/missing-release-assets.log"
+
+export RELEASE_PLZ_RELEASES_JSON='[{"package_name":"demo","version":"1.1.0","tag":"demo-v1.1.0"},{"package_name":"other","version":"1.1.0","tag":"other-v1.1.0"}]'
+x52-comment-release-pr "$RELEASE_PLZ_RELEASES_JSON" deadbeef >>"$comment_log"
+x52-comment-release-assets-uploaded "$RELEASE_PLZ_RELEASES_JSON" deadbeef >>"$comment_log"
+
+[[ "$(grep -Fc 'gh <api> <--paginate> </repos/example/demo/releases?per_page=100>' "$command_log")" == 8 ]]
 
 cat >"$fixture_root/CHANGELOG.md" <<'EOF'
 # Changelog
