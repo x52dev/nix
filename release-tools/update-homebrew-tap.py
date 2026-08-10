@@ -58,11 +58,6 @@ def run(*command: str, cwd: Path | None = None, check: bool = True) -> subproces
     return result
 
 
-def run_authenticated_git(git: str, gh: str, *command: str, check: bool = True) -> subprocess.CompletedProcess[str]:
-    credential_helper = f"!{shlex.quote(gh)} auth git-credential"
-    return run(git, "-c", "credential.helper=", "-c", f"credential.helper={credential_helper}", *command, check=check)
-
-
 def ruby_string(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 
@@ -263,28 +258,25 @@ def main() -> int:
     parser.add_argument("--source-repository", default=os.environ.get("GITHUB_REPOSITORY"), help="release repository")
     parser.add_argument("--tap", default=os.environ.get("X52_HOMEBREW_TAP_REPOSITORY", "x52dev/homebrew-tap"), help="Homebrew tap repository")
     parser.add_argument("--base", default="main", help="tap pull request base branch")
-    parser.add_argument("--tap-directory", default=os.environ.get("X52_HOMEBREW_TAP_DIRECTORY"), help=argparse.SUPPRESS)
+    parser.add_argument(
+        "--tap-directory",
+        default=os.environ.get("X52_HOMEBREW_TAP_DIRECTORY"),
+        help="existing Homebrew tap checkout with Git credentials; defaults to X52_HOMEBREW_TAP_DIRECTORY",
+    )
     args = parser.parse_args()
 
     try:
         release = release_from_arguments(args)
         if not args.source_repository:
             raise UpdateError("--source-repository or GITHUB_REPOSITORY is required")
+        if not args.tap_directory:
+            raise UpdateError("--tap-directory or X52_HOMEBREW_TAP_DIRECTORY is required")
 
         formula_name = args.formula or args.package
         asset_prefix = args.asset_prefix or args.package
         log(f"Updating {formula_name} to {release.version} from {args.source_repository} release {release.tag}")
-        temporary_tap_directory = None
-        if args.tap_directory:
-            tap_directory = Path(args.tap_directory)
-            log(f"Using Homebrew tap checkout {tap_directory}")
-        else:
-            temporary_tap_directory = tempfile.TemporaryDirectory()
-            tap_directory = Path(temporary_tap_directory.name) / "homebrew-tap"
-            gh = os.environ.get("X52_GH", "gh")
-            git = os.environ.get("X52_GIT", "git")
-            log(f"Cloning Homebrew tap {args.tap}")
-            run_authenticated_git(git, gh, "clone", f"https://github.com/{args.tap}.git", str(tap_directory))
+        tap_directory = Path(args.tap_directory)
+        log(f"Using Homebrew tap checkout {tap_directory}")
 
         formula = tap_directory / "Formula" / f"{formula_name}.rb"
         if not formula.is_file():
@@ -293,9 +285,9 @@ def main() -> int:
         git = os.environ.get("X52_GIT", "git")
         gh = os.environ.get("X52_GH", "gh")
         branch = f"release/homebrew-{formula_name}-{release.version}"
-        if run_authenticated_git(git, gh, "-C", str(tap_directory), "ls-remote", "--exit-code", "--heads", "origin", branch, check=False).returncode == 0:
+        if run(git, "-C", str(tap_directory), "ls-remote", "--exit-code", "--heads", "origin", branch, check=False).returncode == 0:
             log(f"Reusing tap branch {branch}")
-            run_authenticated_git(git, gh, "-C", str(tap_directory), "fetch", "origin", branch)
+            run(git, "-C", str(tap_directory), "fetch", "origin", branch)
             run(git, "-C", str(tap_directory), "switch", "--track", f"origin/{branch}")
         else:
             log(f"Creating tap branch {branch}")
@@ -318,7 +310,7 @@ def main() -> int:
         run(git, "-C", str(tap_directory), "add", f"Formula/{formula_name}.rb")
         run(git, "-C", str(tap_directory), "commit", "-m", f"chore: update {formula_name} to {release.version}")
         log(f"Pushing tap branch {branch}")
-        run_authenticated_git(git, gh, "-C", str(tap_directory), "push", "--set-upstream", "origin", branch)
+        run(git, "-C", str(tap_directory), "push", "--set-upstream", "origin", branch)
         log(f"Creating pull request in {args.tap}")
         run(gh, "pr", "create", "--repo", args.tap, "--base", args.base, "--head", branch, "--title", f"chore: update {formula_name} to {release.version}", "--body", f"Automated update from {args.source_repository} release {release.tag}.")
         return 0
