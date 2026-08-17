@@ -288,6 +288,8 @@ grep -Fq 'license "MIT OR Apache-2.0"' "$tap_root/Formula/demo-formula.rb"
 grep -Fq 'assert_match "custom test", shell_output("#{bin}/demo-formula verify")' "$tap_root/Formula/demo-formula.rb"
 grep -Fq '# x52-release-tools: begin macos artifacts' "$tap_root/Formula/demo-formula.rb"
 grep -Fq 'gh <pr> <create> <--repo> <example/tap> <--base> <release> <--head> <release/homebrew-demo-formula-1.1.0>' "$command_log"
+grep -Fq 'git <-C> <'"$tap_root"'> <config> <user.name> <x52-homebrew-tap-updater[bot]>' "$command_log"
+grep -Fq 'git <-C> <'"$tap_root"'> <config> <user.email> <315069165+x52-homebrew-tap-updater[bot]@users.noreply.github.com>' "$command_log"
 grep -Fq 'git <-C> <'"$tap_root"'> <commit> <-m> <chore: update demo-formula to 1.1.0>' "$command_log"
 grep -Fq 'git <-C> <'"$tap_root"'> <push> <--set-upstream> <origin> <release/homebrew-demo-formula-1.1.0>' "$command_log"
 if grep -Fq 'gh <auth> <setup-git>' "$command_log"; then

@@ -16,6 +16,8 @@ ARTIFACT_TARGETS = {
     "linux": (("arm", "aarch64-unknown-linux-gnu"), ("intel", "x86_64-unknown-linux-gnu")),
     "macos": (("arm", "aarch64-apple-darwin"), ("intel", "x86_64-apple-darwin")),
 }
+HOMEBREW_TAP_APP_BOT_LOGIN = "x52-homebrew-tap-updater[bot]"
+HOMEBREW_TAP_APP_BOT_ID = "315069165"
 MARKER = re.compile(
     r"^(?P<indent>\s*)#\s*x52-release-tools:\s*(?P<edge>begin|end)\s+(?:(?P<os>[a-z]+)\s+artifacts|(?P<kind>version|metadata))\s*$",
     re.IGNORECASE,
@@ -304,8 +306,15 @@ def main() -> int:
             log(f"Formula {formula_name} already has version {release.version}; skipping")
             return 0
 
-        run(git, "-C", str(tap_directory), "config", "user.name", "x52dev release bot")
-        run(git, "-C", str(tap_directory), "config", "user.email", "release-bot@users.noreply.github.com")
+        run(git, "-C", str(tap_directory), "config", "user.name", HOMEBREW_TAP_APP_BOT_LOGIN)
+        run(
+            git,
+            "-C",
+            str(tap_directory),
+            "config",
+            "user.email",
+            f"{HOMEBREW_TAP_APP_BOT_ID}+{HOMEBREW_TAP_APP_BOT_LOGIN}@users.noreply.github.com",
+        )
         log(f"Committing Formula/{formula_name}.rb")
         run(git, "-C", str(tap_directory), "add", f"Formula/{formula_name}.rb")
         run(git, "-C", str(tap_directory), "commit", "-m", f"chore: update {formula_name} to {release.version}")
