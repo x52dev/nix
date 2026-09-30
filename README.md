@@ -1,6 +1,6 @@
 # x52 Nix
 
-[![Discord: Join chat](https://img.shields.io/badge/Discord-Join%20chat-5865F2?logo=discord&logoColor=white)](https://discord.gg/8XMdn5WApD)
+[![Chat on Discord](https://img.shields.io/discord/1554698838651179088?label=chat&logo=discord)](https://discord.gg/8XMdn5WApD)
 
 Shared Nix packages and [Just](https://just.systems/) fragments for x52 projects.
 
