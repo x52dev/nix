@@ -18,7 +18,7 @@ The lookup uses `cargo metadata --no-deps`, ignores non-workspace packages, and 
 Contains release-plz post-processing commands:
 
 - `x52-bump-changelogs` checks out a release-plz pull request, adds the released versions to crate changelogs, updates README version links, and pushes a commit when anything changed.
-- `x52-update-release-notes` copies the matching changelog sections into GitHub releases.
+- `x52-update-release-notes` copies the matching changelog sections into GitHub releases. Use `--then-undraft` to publish each release after its notes update succeeds.
 - `x52-comment-release-pr` adds or updates a draft-release link comment on the merged release pull request.
 - `x52-comment-release-assets-uploaded` adds or updates a comment after the release assets are uploaded.
 - `x52-update-homebrew-tap` updates macOS checksums in `x52dev/homebrew-tap` and opens a formula pull request.
@@ -114,6 +114,17 @@ For GitHub Actions, enter the development shell before invoking the release comm
 ```
 
 Pass release-plz output through `RELEASE_PLZ_PR_JSON` or `RELEASE_PLZ_RELEASES_JSON`, and provide `GH_TOKEN` for GitHub mutations.
+
+`x52-update-release-notes` leaves the release's draft status unchanged by default.
+To publish each release after its changelog notes are set, run:
+
+```sh
+x52-update-release-notes --then-undraft
+```
+
+The command skips releases whose package has no `CHANGELOG.md`. A failed notes
+update stops the command before it publishes that release. An empty changelog
+section uses the existing fallback note and can still be published.
 
 The commands use fixed `x52-` HTML markers. They make retries update the existing comment instead of creating another one:
 
