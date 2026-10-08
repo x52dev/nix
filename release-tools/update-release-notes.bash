@@ -1,6 +1,28 @@
 set -eEuo pipefail
 shopt -s inherit_errexit
 
+undraft=false
+
+while (( $# > 0 )); do
+    case "$1" in
+        --then-undraft)
+            undraft=true
+            ;;
+        -h | --help)
+            echo "Usage: x52-update-release-notes [--then-undraft]"
+            echo "Copy changelog notes to GitHub releases."
+            echo "Use --then-undraft to publish each release after its notes update succeeds."
+            exit 0
+            ;;
+        *)
+            echo "Unknown argument: $1" >&2
+            exit 2
+            ;;
+    esac
+
+    shift
+done
+
 release_plz_releases_json="${RELEASE_PLZ_RELEASES_JSON:?RELEASE_PLZ_RELEASES_JSON is required}"
 cargo_bin="${X52_CARGO:-cargo}"
 gh_bin="${X52_GH:-gh}"
@@ -76,6 +98,11 @@ update_release_notes() {
     fi
 
     "$gh_bin" release edit "$tag" --notes="$notes"
+
+    if [[ "$undraft" == "true" ]]; then
+        echo "Publishing ${tag}"
+        "$gh_bin" release edit "$tag" --draft=false
+    fi
 }
 
 while IFS=$'\t' read -r name version tag; do

@@ -94,6 +94,11 @@ printf ' <%s>' "$@" >>"$COMMAND_LOG"
 printf '\n' >>"$COMMAND_LOG"
 
 case "$*" in
+    'release edit demo-v1.1.0 --notes='*)
+        if [[ "${RELEASE_NOTES_EDIT_FAIL:-false}" == "true" ]]; then
+            exit 17
+        fi
+        ;;
     *'/commits/'*'/pulls'*)
         printf '42\n'
         ;;
@@ -202,10 +207,69 @@ grep -Fq 'gh <pr> <checkout> <42>' "$command_log"
 grep -Fq 'git <push>' "$command_log"
 
 export RELEASE_PLZ_RELEASES_JSON='[{"package_name":"demo","version":"1.1.0","tag":"demo-v1.1.0"}]'
-x52-update-release-notes
+COMMAND_LOG="$test_root/release-notes-default.log" x52-update-release-notes
 
-grep -Fq 'gh <release> <edit> <demo-v1.1.0>' "$command_log"
-grep -Fq '<--notes=- Added feature.>' "$command_log"
+cat >"$test_root/expected-release-notes-default.log" <<'EOF'
+gh <release> <edit> <demo-v1.1.0> <--notes=- Added feature.>
+EOF
+
+diff -u "$test_root/expected-release-notes-default.log" "$test_root/release-notes-default.log"
+
+COMMAND_LOG="$test_root/release-notes-undraft.log" x52-update-release-notes --then-undraft
+
+cat >"$test_root/expected-release-notes-undraft.log" <<'EOF'
+gh <release> <edit> <demo-v1.1.0> <--notes=- Added feature.>
+gh <release> <edit> <demo-v1.1.0> <--draft=false>
+EOF
+
+diff -u "$test_root/expected-release-notes-undraft.log" "$test_root/release-notes-undraft.log"
+
+if COMMAND_LOG="$test_root/release-notes-failed.log" RELEASE_NOTES_EDIT_FAIL=true \
+    x52-update-release-notes --then-undraft; then
+    echo "Expected a failed release notes update to fail" >&2
+    exit 1
+else
+    [[ "$?" == 17 ]]
+fi
+
+diff -u "$test_root/expected-release-notes-default.log" "$test_root/release-notes-failed.log"
+
+mv "$fixture_root/CHANGELOG.md" "$fixture_root/CHANGELOG.md.saved"
+touch "$test_root/release-notes-missing.log"
+COMMAND_LOG="$test_root/release-notes-missing.log" x52-update-release-notes --then-undraft
+[[ ! -s "$test_root/release-notes-missing.log" ]]
+
+cat >"$fixture_root/CHANGELOG.md" <<'EOF'
+# Changelog
+
+## 1.1.0
+EOF
+
+COMMAND_LOG="$test_root/release-notes-empty.log" x52-update-release-notes --then-undraft
+
+cat >"$test_root/expected-release-notes-empty.log" <<'EOF'
+gh <release> <edit> <demo-v1.1.0> <--notes=- No significant changes since the previous release.>
+gh <release> <edit> <demo-v1.1.0> <--draft=false>
+EOF
+
+diff -u "$test_root/expected-release-notes-empty.log" "$test_root/release-notes-empty.log"
+mv "$fixture_root/CHANGELOG.md.saved" "$fixture_root/CHANGELOG.md"
+
+touch "$test_root/release-notes-invalid-option.log"
+if COMMAND_LOG="$test_root/release-notes-invalid-option.log" \
+    x52-update-release-notes --unknown >"$test_root/release-notes-invalid-option-output.log" 2>&1; then
+    echo "Expected an unknown release notes option to fail" >&2
+    exit 1
+else
+    [[ "$?" == 2 ]]
+fi
+
+[[ ! -s "$test_root/release-notes-invalid-option.log" ]]
+[[ "$(<"$test_root/release-notes-invalid-option-output.log")" == 'Unknown argument: --unknown' ]]
+
+env -u RELEASE_PLZ_RELEASES_JSON X52_CARGO=/nonexistent \
+    x52-update-release-notes --help >"$test_root/release-notes-help.log"
+[[ "$(<"$test_root/release-notes-help.log")" == *'Usage: x52-update-release-notes [--then-undraft]'* ]]
 
 export GITHUB_REPOSITORY='example/demo'
 x52-comment-release-pr "$RELEASE_PLZ_RELEASES_JSON" deadbeef >"$comment_log"
