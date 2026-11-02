@@ -58,6 +58,7 @@ perSystem = { config, pkgs, ... }: {
   devShells.default = pkgs.mkShell {
     packages = [
       pkgs.cargo
+      pkgs.jq
       pkgs.just
     ];
 
